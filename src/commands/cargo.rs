@@ -48,9 +48,7 @@ pub enum CargoCommand {
 pub async fn run(cmd: &CargoCommand, api_url: &str, client: &Client) -> Result<()> {
     match cmd {
         CargoCommand::Tables => commands::cargo_tables::run(client, api_url).await,
-        CargoCommand::Fields { table } => {
-            commands::cargo_fields::run(client, api_url, table).await
-        }
+        CargoCommand::Fields { table } => commands::cargo_fields::run(client, api_url, table).await,
         CargoCommand::Query {
             tables,
             fields,

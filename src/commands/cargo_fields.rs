@@ -28,10 +28,7 @@ pub async fn run(client: &Client, api_url: &str, table: &str) -> Result<()> {
     entries.sort_by_key(|(k, _)| *k);
 
     for (name, val) in entries {
-        let type_str = val
-            .get("type")
-            .and_then(Value::as_str)
-            .unwrap_or("Unknown");
+        let type_str = val.get("type").and_then(Value::as_str).unwrap_or("Unknown");
         println!("{name}\t{type_str}");
     }
 

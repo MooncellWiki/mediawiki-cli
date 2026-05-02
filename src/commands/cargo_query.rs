@@ -81,12 +81,7 @@ pub async fn run(
             .context("unexpected API response: cargoquery item missing title object")?;
         let vals: Vec<String> = all_keys
             .iter()
-            .map(|k| {
-                row.get(k)
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string()
-            })
+            .map(|k| row.get(k).and_then(Value::as_str).unwrap_or("").to_string())
             .collect();
         println!("{}", vals.join("\t"));
     }

@@ -68,8 +68,6 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Auth { command } => commands::auth::run(&command, &cli.api_url, &client).await,
         Commands::Page { command } => commands::page::run(&command, &cli.api_url, &client).await,
-        Commands::Cargo { command } => {
-            commands::cargo::run(&command, &cli.api_url, &client).await
-        }
+        Commands::Cargo { command } => commands::cargo::run(&command, &cli.api_url, &client).await,
     }
 }

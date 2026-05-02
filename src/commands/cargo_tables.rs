@@ -23,10 +23,7 @@ pub async fn run(client: &Client, api_url: &str) -> Result<()> {
         return Ok(());
     }
 
-    let mut names: Vec<&str> = tables
-        .iter()
-        .filter_map(Value::as_str)
-        .collect();
+    let mut names: Vec<&str> = tables.iter().filter_map(Value::as_str).collect();
     names.sort();
 
     for name in names {
