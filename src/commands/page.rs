@@ -60,6 +60,14 @@ pub enum PageCommand {
         #[arg(long, default_value_t = 20)]
         limit: u32,
     },
+    /// List all pages in a category.
+    Category {
+        /// Category name (with or without "Category:" prefix).
+        title: String,
+        /// Maximum number of results (unlimited by default).
+        #[arg(long)]
+        limit: Option<u32>,
+    },
     /// Search pages by keyword.
     Search {
         /// The search query.
@@ -101,6 +109,9 @@ pub async fn run(cmd: &PageCommand, api_url: &str, client: &Client) -> Result<()
         } => commands::info::run(client, api_url, title.as_deref(), *revid, *templates).await,
         PageCommand::History { title, limit } => {
             commands::history::run(client, api_url, title, *limit).await
+        }
+        PageCommand::Category { title, limit } => {
+            commands::category::run(client, api_url, title, *limit).await
         }
         PageCommand::Search { query, limit } => {
             commands::search::run(client, api_url, query, *limit).await

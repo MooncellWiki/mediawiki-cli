@@ -6,26 +6,20 @@ use crate::api;
 
 pub async fn run(client: &Client, api_url: &str, title: &str, limit: u32) -> Result<()> {
     println!("RevID\tTimestamp\tUser\tSize\tComment");
-    let mut rvcontinue: Option<String> = None;
     let mut count: u32 = 0;
 
-    loop {
-        let mut params = vec![
-            ("action", "query".to_string()),
-            ("prop", "revisions".to_string()),
-            ("titles", title.to_string()),
-            ("rvprop", "ids|timestamp|user|comment|size".to_string()),
-            ("rvlimit", limit.to_string()),
-            ("format", "json".to_string()),
-            ("formatversion", "2".to_string()),
-        ];
+    let base_params = vec![
+        ("action", "query".to_string()),
+        ("prop", "revisions".to_string()),
+        ("titles", title.to_string()),
+        ("rvprop", "ids|timestamp|user|comment|size".to_string()),
+        ("rvlimit", limit.to_string()),
+        ("format", "json".to_string()),
+        ("formatversion", "2".to_string()),
+    ];
 
-        if let Some(token) = &rvcontinue {
-            params.push(("rvcontinue", token.clone()));
-        }
-
-        let json = api::get_json(client, api_url, &params).await?;
-        let page = api::first_page(&json)?;
+    api::paginate(client, api_url, &base_params, "rvcontinue", None, |json| {
+        let page = api::first_page(json)?;
 
         if page.get("missing").is_some() {
             bail!("page not found: {title}");
@@ -34,7 +28,7 @@ pub async fn run(client: &Client, api_url: &str, title: &str, limit: u32) -> Res
         if let Some(revisions) = page.get("revisions").and_then(Value::as_array) {
             for rev in revisions {
                 if count >= limit {
-                    break;
+                    return Ok(false);
                 }
                 let rev_id = rev.get("revid").and_then(Value::as_i64).unwrap_or(0);
                 let timestamp = rev.get("timestamp").and_then(Value::as_str).unwrap_or("-");
@@ -51,19 +45,7 @@ pub async fn run(client: &Client, api_url: &str, title: &str, limit: u32) -> Res
             }
         }
 
-        if count >= limit {
-            break;
-        }
-
-        rvcontinue = json
-            .pointer("/continue/rvcontinue")
-            .and_then(Value::as_str)
-            .map(ToOwned::to_owned);
-
-        if rvcontinue.is_none() {
-            break;
-        }
-    }
-
-    Ok(())
+        Ok(count < limit)
+    })
+    .await
 }

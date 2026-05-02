@@ -17,8 +17,9 @@ pub async fn run(
 
     let mut params = vec![
         ("action", "query".to_string()),
-        ("prop", "info".to_string()),
+        ("prop", "info|categories".to_string()),
         ("inprop", "url|displaytitle".to_string()),
+        ("cllimit", "max".to_string()),
         ("format", "json".to_string()),
         ("formatversion", "2".to_string()),
     ];
@@ -53,6 +54,21 @@ pub async fn run(
     println!("ID:     {page_id}");
     println!("URL:    {full_url}");
 
+    let cat_names: Vec<&str> = page
+        .get("categories")
+        .and_then(Value::as_array)
+        .map(|cats| {
+            cats.iter()
+                .filter_map(|c| c.get("title").and_then(Value::as_str))
+                .collect()
+        })
+        .unwrap_or_default();
+    if cat_names.is_empty() {
+        println!("Cats:   (none)");
+    } else {
+        println!("Cats:   {}", cat_names.join(", "));
+    }
+
     Ok(())
 }
 
@@ -62,33 +78,26 @@ async fn list_templates(
     title: Option<&str>,
     revid: Option<i64>,
 ) -> Result<()> {
-    let mut tlcontinue: Option<String> = None;
     let mut all_templates: Vec<String> = Vec::new();
 
-    loop {
-        let mut params = vec![
-            ("action", "query".to_string()),
-            ("prop", "templates".to_string()),
-            ("tllimit", "max".to_string()),
-            ("format", "json".to_string()),
-            ("formatversion", "2".to_string()),
-        ];
+    let mut base_params = vec![
+        ("action", "query".to_string()),
+        ("prop", "templates".to_string()),
+        ("tllimit", "max".to_string()),
+        ("format", "json".to_string()),
+        ("formatversion", "2".to_string()),
+    ];
 
-        if let Some(id) = revid {
-            params.push(("revids", id.to_string()));
-        } else if let Some(t) = title {
-            params.push(("titles", t.to_string()));
-        } else {
-            bail!("must specify either a page title or --revid");
-        }
+    if let Some(id) = revid {
+        base_params.push(("revids", id.to_string()));
+    } else if let Some(t) = title {
+        base_params.push(("titles", t.to_string()));
+    } else {
+        bail!("must specify either a page title or --revid");
+    }
 
-        if let Some(token) = &tlcontinue {
-            params.push(("continue", "||".to_string()));
-            params.push(("tlcontinue", token.clone()));
-        }
-
-        let json = api::get_json(client, api_url, &params).await?;
-        let page = api::first_page(&json)?;
+    api::paginate(client, api_url, &base_params, "tlcontinue", Some("||"), |json| {
+        let page = api::first_page(json)?;
 
         if page.get("missing").is_some() {
             match (title, revid) {
@@ -106,15 +115,9 @@ async fn list_templates(
             }
         }
 
-        tlcontinue = json
-            .pointer("/continue/tlcontinue")
-            .and_then(Value::as_str)
-            .map(ToOwned::to_owned);
-
-        if tlcontinue.is_none() {
-            break;
-        }
-    }
+        Ok(true)
+    })
+    .await?;
 
     if all_templates.is_empty() {
         println!("No templates.");

@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod category;
 pub mod edit;
 pub mod get;
 pub mod history;

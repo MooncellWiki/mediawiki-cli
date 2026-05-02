@@ -53,7 +53,48 @@ pub fn first_page(json: &Value) -> Result<&Value> {
         .context("unexpected API response: query.pages missing")
 }
 
-/// Extract wikitext content from a page JSON object returned by the revisions API.
+pub async fn paginate<F>(
+    client: &Client,
+    api_url: &str,
+    base_params: &[(&str, String)],
+    continue_key: &str,
+    continue_extra: Option<&str>,
+    mut handler: F,
+) -> Result<()>
+where
+    F: FnMut(&Value) -> Result<bool>,
+{
+    let mut cont_token: Option<String> = None;
+
+    loop {
+        let mut params = base_params.to_vec();
+
+        if let Some(ref token) = cont_token {
+            params.push((continue_key, token.clone()));
+            if let Some(extra) = continue_extra {
+                params.push(("continue", extra.to_string()));
+            }
+        }
+
+        let json = get_json(client, api_url, &params).await?;
+
+        if !handler(&json)? {
+            break;
+        }
+
+        cont_token = json
+            .pointer(&format!("/continue/{continue_key}"))
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned);
+
+        if cont_token.is_none() {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
 pub fn page_content(page: &Value) -> Result<&str> {
     page.pointer("/revisions/0/slots/main/content")
         .and_then(Value::as_str)
