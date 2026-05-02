@@ -37,8 +37,11 @@ pub enum PageCommand {
         #[arg(long, value_names = ["OLD", "NEW"], num_args = 2, conflicts_with_all = ["file", "content"])]
         replace: Option<Vec<String>>,
         /// Provide page content directly on the command line.
-        #[arg(short, long, conflicts_with_all = ["file", "replace"])]
+        #[arg(short, long, conflicts_with_all = ["file", "replace", "null_edit"])]
         content: Option<String>,
+        /// Submit a null edit (resubmit current content without changes).
+        #[arg(long, conflicts_with_all = ["file", "replace", "content"])]
+        null_edit: bool,
     },
     /// Show page information.
     Info {
@@ -91,6 +94,7 @@ pub async fn run(cmd: &PageCommand, api_url: &str, client: &Client) -> Result<()
             file,
             replace,
             content,
+            null_edit,
         } => {
             let opts = EditOptions {
                 summary: summary.as_deref(),
@@ -99,6 +103,7 @@ pub async fn run(cmd: &PageCommand, api_url: &str, client: &Client) -> Result<()
                 file: file.as_ref(),
                 replace: replace.as_deref(),
                 content: content.as_deref(),
+                null_edit: *null_edit,
             };
             commands::edit::run(client, api_url, title, &opts).await
         }

@@ -48,7 +48,7 @@ mediawiki-cli page get --revid 12345
 
 ### `page edit <title> [options]`
 
-Edit a page. Content can be provided via stdin, a file, the `--content` flag, or the `--replace` flag.
+Edit a page. Content can be provided via stdin, a file, the `--content` flag, the `--replace` flag, or as a null edit.
 
 | Option | Description |
 |--------|-------------|
@@ -56,8 +56,9 @@ Edit a page. Content can be provided via stdin, a file, the `--content` flag, or
 | `--minor` | Mark as minor edit |
 | `--create-only` | Only create the page; fail if it already exists |
 | `-f, --file <path>` | Read content from a file |
-| `--content <text>` | Provide content directly on the command line |
+| `-c, --content <text>` | Provide content directly on the command line |
 | `--replace <OLD> <NEW>` | Replace a single occurrence of `OLD` with `NEW` in the page |
+| `--null-edit` | Submit a null edit (resubmit current content without changes) |
 
 ```sh
 # from stdin
@@ -71,11 +72,14 @@ mediawiki-cli page edit "Sandbox" --content "hello world"
 
 # find-and-replace (exact one match required)
 mediawiki-cli page edit "Sandbox" --replace "old text" "new text"
+
+# null edit
+mediawiki-cli page edit "Sandbox" --null-edit
 ```
 
 ### `page info [<title>] [--revid <ID>] [--templates]`
 
-Show page metadata (title, page ID, URL). Use `--templates` to list all transcluded templates.
+Show page metadata (title, page ID, URL, categories). Use `--templates` to list all transcluded templates.
 
 ```sh
 mediawiki-cli page info "Main Page"
@@ -90,6 +94,15 @@ List page revision history. Outputs rev ID, timestamp, user, size, and comment i
 ```sh
 mediawiki-cli page history "Main Page"
 mediawiki-cli page history "Main Page" --limit 50
+```
+
+### `page category <title> [--limit <N>]`
+
+List all pages in a category. The category name can be provided with or without the "Category:" prefix. By default, all members are listed; use `--limit` to cap the number of results.
+
+```sh
+mediawiki-cli page category "Templates"
+mediawiki-cli page category "Category:Templates" --limit 50
 ```
 
 ### `page search <query> [--limit <N>]`

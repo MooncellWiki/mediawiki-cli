@@ -13,6 +13,7 @@ pub struct EditOptions<'a> {
     pub file: Option<&'a PathBuf>,
     pub replace: Option<&'a [String]>,
     pub content: Option<&'a str>,
+    pub null_edit: bool,
 }
 
 pub async fn run(
@@ -34,7 +35,23 @@ pub async fn run(
         .to_string();
     tracing::debug!(token = %csrf_token, "obtained CSRF token");
 
-    let content = if let Some(parts) = opts.replace {
+    let content = if opts.null_edit {
+        let fetch_params = vec![
+            ("action", "query".to_string()),
+            ("prop", "revisions".to_string()),
+            ("titles", title.to_string()),
+            ("rvslots", "main".to_string()),
+            ("rvprop", "content".to_string()),
+            ("format", "json".to_string()),
+            ("formatversion", "2".to_string()),
+        ];
+        let json = api::get_json(client, api_url, &fetch_params).await?;
+        let page = api::first_page(&json)?;
+        if page.get("missing").is_some() {
+            bail!("page not found: {title}");
+        }
+        api::page_content(page)?.to_string()
+    } else if let Some(parts) = opts.replace {
         let old = &parts[0];
         let new = &parts[1];
         let fetch_params = vec![

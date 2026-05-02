@@ -85,6 +85,7 @@ pub async fn login(api_url: &str, username: &str, password: &str) -> Result<Logi
         ("password", password.to_string()),
         ("logintoken", login_token),
         ("loginreturnurl", "https://localhost/".to_string()),
+        ("rememberme", "1".to_string()),
         ("format", "json".to_string()),
     ];
 
