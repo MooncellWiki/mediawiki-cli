@@ -96,27 +96,34 @@ async fn list_templates(
         bail!("must specify either a page title or --revid");
     }
 
-    api::paginate(client, api_url, &base_params, "tlcontinue", Some("||"), |json| {
-        let page = api::first_page(json)?;
+    api::paginate(
+        client,
+        api_url,
+        &base_params,
+        "tlcontinue",
+        Some("||"),
+        |json| {
+            let page = api::first_page(json)?;
 
-        if page.get("missing").is_some() {
-            match (title, revid) {
-                (Some(t), _) => bail!("not found: {t}"),
-                (_, Some(id)) => bail!("not found: revision {id}"),
-                _ => bail!("not found"),
-            }
-        }
-
-        if let Some(items) = page.get("templates").and_then(Value::as_array) {
-            for item in items {
-                if let Some(name) = item.get("title").and_then(Value::as_str) {
-                    all_templates.push(name.to_string());
+            if page.get("missing").is_some() {
+                match (title, revid) {
+                    (Some(t), _) => bail!("not found: {t}"),
+                    (_, Some(id)) => bail!("not found: revision {id}"),
+                    _ => bail!("not found"),
                 }
             }
-        }
 
-        Ok(true)
-    })
+            if let Some(items) = page.get("templates").and_then(Value::as_array) {
+                for item in items {
+                    if let Some(name) = item.get("title").and_then(Value::as_str) {
+                        all_templates.push(name.to_string());
+                    }
+                }
+            }
+
+            Ok(true)
+        },
+    )
     .await?;
 
     if all_templates.is_empty() {
