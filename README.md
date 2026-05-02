@@ -114,6 +114,43 @@ mediawiki-cli page search "arknights"
 mediawiki-cli page search "arknights" --limit 20
 ```
 
+### `cargo tables`
+
+List all Cargo database tables on the wiki. Outputs table names sorted alphabetically.
+
+```sh
+mediawiki-cli cargo tables
+```
+
+### `cargo fields <table>`
+
+Show all fields and their types for a given Cargo table. Outputs field name and type (e.g. `String`, `Wikitext`) in a tab-separated format.
+
+```sh
+mediawiki-cli cargo fields chara
+```
+
+### `cargo query --tables <tables> --fields <fields> [options]`
+
+Run a Cargo query against the wiki database. Results are output as tab-separated values with a header row.
+
+| Option | Description |
+|--------|-------------|
+| `--tables <tables>` | Comma-separated table names to query |
+| `--fields <fields>` | Comma-separated field names to retrieve |
+| `--where <clause>` | SQL-style WHERE condition |
+| `--join-on <clause>` | SQL-style JOIN ON condition |
+| `--group-by <clause>` | SQL-style GROUP BY clause |
+| `--having <clause>` | SQL-style HAVING clause |
+| `--order-by <clause>` | SQL-style ORDER BY clause |
+| `--limit <N>` | Maximum number of results (default: 50) |
+| `--offset <N>` | Query offset |
+
+```sh
+mediawiki-cli cargo query --tables chara --fields name,rarity --limit 5
+mediawiki-cli cargo query --tables building_skill2 --fields name,room --where "room='控制中枢'" --limit 10
+```
+
 ## Authentication
 
 `mediawiki-cli` uses the MediaWiki `clientlogin` API for authentication. After logging in with `auth login`, the session cookie is stored locally and automatically sent with subsequent requests. You can also pass a cookie directly with `--cookie` without using the login flow.

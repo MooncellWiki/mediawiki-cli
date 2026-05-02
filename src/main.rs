@@ -7,6 +7,7 @@ mod auth;
 mod commands;
 
 use commands::auth::AuthCommand;
+use commands::cargo::CargoCommand;
 use commands::page::PageCommand;
 
 #[derive(Debug, Parser)]
@@ -43,6 +44,11 @@ enum Commands {
         #[command(subcommand)]
         command: PageCommand,
     },
+    /// Cargo database commands.
+    Cargo {
+        #[command(subcommand)]
+        command: CargoCommand,
+    },
 }
 
 #[tokio::main]
@@ -62,5 +68,8 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Auth { command } => commands::auth::run(&command, &cli.api_url, &client).await,
         Commands::Page { command } => commands::page::run(&command, &cli.api_url, &client).await,
+        Commands::Cargo { command } => {
+            commands::cargo::run(&command, &cli.api_url, &client).await
+        }
     }
 }

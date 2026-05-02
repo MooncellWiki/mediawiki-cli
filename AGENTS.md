@@ -18,9 +18,10 @@ Single-crate Rust CLI (`edition = "2024"`). All source under `src/`.
 - `api.rs` — Shared reqwest client builder, `get_json()`, `paginate()`, `first_page()`, and `page_content()` helpers for MediaWiki API calls.
 - `auth.rs` — Cookie persistence (`~/.config/mediawiki-cli/cookies.json`), login flow with 2FA support.
 - `commands/` — One file per subcommand, plus `mod.rs` and dispatcher files:
-  - `auth.rs` / `page.rs` — clap subcommand dispatchers
+  - `auth.rs` / `page.rs` / `cargo.rs` — clap subcommand dispatchers
   - `login.rs`, `status.rs` — auth subcommand implementations
   - `get.rs`, `edit.rs`, `info.rs`, `history.rs`, `category.rs`, `search.rs` — page subcommand implementations
+  - `cargo_tables.rs`, `cargo_fields.rs`, `cargo_query.rs` — cargo subcommand implementations
 
 ## CLI Commands
 
@@ -33,6 +34,9 @@ page info [<title>] [--revid ID] [--templates]  # page metadata + categories; --
 page history <title> [--limit N]  # list revision history
 page category <title> [--limit N]  # list pages in a category
 page search <query> [--limit N]  # search pages
+cargo tables                     # list all Cargo tables
+cargo fields <table>             # show fields and types of a Cargo table
+cargo query --tables <tables> --fields <fields> [--where ...] [--join-on ...] [--group-by ...] [--having ...] [--order-by ...] [--limit N] [--offset N]  # run a Cargo query
 ```
 
 ## Key Conventions

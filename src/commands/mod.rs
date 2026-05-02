@@ -1,4 +1,8 @@
 pub mod auth;
+pub mod cargo;
+pub mod cargo_fields;
+pub mod cargo_query;
+pub mod cargo_tables;
 pub mod category;
 pub mod edit;
 pub mod get;
