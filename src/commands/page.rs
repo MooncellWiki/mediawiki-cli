@@ -79,6 +79,14 @@ pub enum PageCommand {
         #[arg(long, default_value_t = 10)]
         limit: u32,
     },
+    /// List pages that embed (transclude) the given page.
+    EmbeddedIn {
+        /// Page title (e.g. a template name).
+        title: String,
+        /// Maximum number of results.
+        #[arg(long, default_value_t = 20)]
+        limit: u32,
+    },
 }
 
 pub async fn run(cmd: &PageCommand, api_url: &str, client: &Client) -> Result<()> {
@@ -120,6 +128,9 @@ pub async fn run(cmd: &PageCommand, api_url: &str, client: &Client) -> Result<()
         }
         PageCommand::Search { query, limit } => {
             commands::search::run(client, api_url, query, *limit).await
+        }
+        PageCommand::EmbeddedIn { title, limit } => {
+            commands::embedded_in::run(client, api_url, title, *limit).await
         }
     }
 }

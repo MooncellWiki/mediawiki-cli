@@ -8,7 +8,8 @@ cargo run -- <subcommand> [options]
 cargo run -- --api-url <URL> --log-level debug -- <subcommand>
 ```
 
-No tests exist yet. No lint/typecheck commands beyond `cargo check` / `cargo clippy`.
+CI runs: `cargo fmt --all -- --check` then `cargo clippy --all-targets -- -D warnings`.
+No tests exist yet.
 
 ## Project Structure
 
@@ -20,24 +21,8 @@ Single-crate Rust CLI (`edition = "2024"`). All source under `src/`.
 - `commands/` — One file per subcommand, plus `mod.rs` and dispatcher files:
   - `auth.rs` / `page.rs` / `cargo.rs` — clap subcommand dispatchers
   - `login.rs`, `status.rs` — auth subcommand implementations
-  - `get.rs`, `edit.rs`, `info.rs`, `history.rs`, `category.rs`, `search.rs` — page subcommand implementations
+  - `get.rs`, `edit.rs`, `info.rs`, `history.rs`, `category.rs`, `search.rs`, `embedded_in.rs` — page subcommand implementations
   - `cargo_tables.rs`, `cargo_fields.rs`, `cargo_query.rs` — cargo subcommand implementations
-
-## CLI Commands
-
-```
-auth login <username>   # prompts for password; stores session cookie
-auth status             # shows current user info
-page get [<title>] [--revid ID]  # fetch raw wikitext by title or revision
-page edit <title> [-s summary] [--minor] [--create-only] [-f file] [-c text] [--replace OLD NEW] [--null-edit]  # edit page
-page info [<title>] [--revid ID] [--templates]  # page metadata + categories; --templates lists transcluded templates
-page history <title> [--limit N]  # list revision history
-page category <title> [--limit N]  # list pages in a category
-page search <query> [--limit N]  # search pages
-cargo tables                     # list all Cargo tables
-cargo fields <table>             # show fields and types of a Cargo table
-cargo query --tables <tables> --fields <fields> [--where ...] [--join-on ...] [--group-by ...] [--having ...] [--order-by ...] [--limit N] [--offset N]  # run a Cargo query
-```
 
 ## Key Conventions
 

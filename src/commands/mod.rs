@@ -5,6 +5,7 @@ pub mod cargo_query;
 pub mod cargo_tables;
 pub mod category;
 pub mod edit;
+pub mod embedded_in;
 pub mod get;
 pub mod history;
 pub mod info;
