@@ -4,48 +4,48 @@ use serde_json::Value;
 
 use crate::api;
 
-pub async fn run(
-    client: &Client,
-    api_url: &str,
-    tables: &str,
-    fields: &str,
-    where_clause: Option<&str>,
-    join_on: Option<&str>,
-    group_by: Option<&str>,
-    having: Option<&str>,
-    order_by: Option<&str>,
-    limit: u32,
-    offset: Option<u32>,
-) -> Result<()> {
-    let mut params = vec![
+pub struct CargoQueryParams<'a> {
+    pub tables: &'a str,
+    pub fields: &'a str,
+    pub where_clause: Option<&'a str>,
+    pub join_on: Option<&'a str>,
+    pub group_by: Option<&'a str>,
+    pub having: Option<&'a str>,
+    pub order_by: Option<&'a str>,
+    pub limit: u32,
+    pub offset: Option<u32>,
+}
+
+pub async fn run(client: &Client, api_url: &str, params: CargoQueryParams<'_>) -> Result<()> {
+    let mut api_params = vec![
         ("action", "cargoquery".to_string()),
-        ("tables", tables.to_string()),
-        ("fields", fields.to_string()),
-        ("limit", limit.to_string()),
+        ("tables", params.tables.to_string()),
+        ("fields", params.fields.to_string()),
+        ("limit", params.limit.to_string()),
         ("format", "json".to_string()),
         ("formatversion", "2".to_string()),
     ];
 
-    if let Some(w) = where_clause {
-        params.push(("where", w.to_string()));
+    if let Some(w) = params.where_clause {
+        api_params.push(("where", w.to_string()));
     }
-    if let Some(j) = join_on {
-        params.push(("join_on", j.to_string()));
+    if let Some(j) = params.join_on {
+        api_params.push(("join_on", j.to_string()));
     }
-    if let Some(g) = group_by {
-        params.push(("group_by", g.to_string()));
+    if let Some(g) = params.group_by {
+        api_params.push(("group_by", g.to_string()));
     }
-    if let Some(h) = having {
-        params.push(("having", h.to_string()));
+    if let Some(h) = params.having {
+        api_params.push(("having", h.to_string()));
     }
-    if let Some(o) = order_by {
-        params.push(("order_by", o.to_string()));
+    if let Some(o) = params.order_by {
+        api_params.push(("order_by", o.to_string()));
     }
-    if let Some(off) = offset {
-        params.push(("offset", off.to_string()));
+    if let Some(off) = params.offset {
+        api_params.push(("offset", off.to_string()));
     }
 
-    let json = api::get_json(client, api_url, &params).await?;
+    let json = api::get_json(client, api_url, &api_params).await?;
 
     let results = json
         .pointer("/cargoquery")

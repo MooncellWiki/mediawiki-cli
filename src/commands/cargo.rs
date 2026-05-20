@@ -63,15 +63,17 @@ pub async fn run(cmd: &CargoCommand, api_url: &str, client: &Client) -> Result<(
             commands::cargo_query::run(
                 client,
                 api_url,
-                tables,
-                fields,
-                r#where.as_deref(),
-                join_on.as_deref(),
-                group_by.as_deref(),
-                having.as_deref(),
-                order_by.as_deref(),
-                *limit,
-                *offset,
+                commands::cargo_query::CargoQueryParams {
+                    tables,
+                    fields,
+                    where_clause: r#where.as_deref(),
+                    join_on: join_on.as_deref(),
+                    group_by: group_by.as_deref(),
+                    having: having.as_deref(),
+                    order_by: order_by.as_deref(),
+                    limit: *limit,
+                    offset: *offset,
+                },
             )
             .await
         }

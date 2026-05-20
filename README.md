@@ -114,6 +114,15 @@ mediawiki-cli page search "arknights"
 mediawiki-cli page search "arknights" --limit 20
 ```
 
+### `page embedded-in <title> [--limit <N>]`
+
+List pages that embed (transclude) the given page. Useful for finding where a template is used.
+
+```sh
+mediawiki-cli page embedded-in "Template:Infobox"
+mediawiki-cli page embedded-in "Template:Infobox" --limit 50
+```
+
 ### `cargo tables`
 
 List all Cargo database tables on the wiki. Outputs table names sorted alphabetically.
