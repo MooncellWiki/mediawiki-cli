@@ -53,6 +53,9 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Die quietly on SIGPIPE so `| head` doesn't panic in println!.
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
+
     let cli = Cli::parse();
 
     let filter = EnvFilter::try_new(&cli.log_level).unwrap_or_else(|_| EnvFilter::new("warn"));

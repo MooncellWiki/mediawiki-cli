@@ -626,6 +626,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dirs",
+ "libc",
  "reqwest",
  "rpassword",
  "serde",

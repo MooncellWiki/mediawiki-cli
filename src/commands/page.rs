@@ -87,6 +87,25 @@ pub enum PageCommand {
         #[arg(long, default_value_t = 20)]
         limit: u32,
     },
+    /// List recent changes within a time window.
+    RecentChanges {
+        /// How many hours back to look; 24 means the past day.
+        #[arg(long, default_value_t = 24)]
+        hours: u64,
+        /// Maximum number of results (unlimited by default).
+        #[arg(long)]
+        limit: Option<u32>,
+        /// Change types to include, |-separated (edit|new|log|external|categorize).
+        #[arg(long = "type", default_value = "edit|new")]
+        rc_type: String,
+    },
+    /// Show a unified diff of a revision against its parent, or between two revisions.
+    Diff {
+        /// Revision ID (the older side when a second ID is given).
+        revid: i64,
+        /// Second revision ID; without it, diff REVID against its parent.
+        to: Option<i64>,
+    },
 }
 
 pub async fn run(cmd: &PageCommand, api_url: &str, client: &Client) -> Result<()> {
@@ -132,5 +151,11 @@ pub async fn run(cmd: &PageCommand, api_url: &str, client: &Client) -> Result<()
         PageCommand::EmbeddedIn { title, limit } => {
             commands::embedded_in::run(client, api_url, title, *limit).await
         }
+        PageCommand::RecentChanges {
+            hours,
+            limit,
+            rc_type,
+        } => commands::recent_changes::run(client, api_url, *hours, *limit, rc_type).await,
+        PageCommand::Diff { revid, to } => commands::diff::run(client, api_url, *revid, *to).await,
     }
 }
