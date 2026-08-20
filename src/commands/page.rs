@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use crate::commands;
 use crate::commands::edit::EditOptions;
+use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum PageCommand {
@@ -108,10 +109,15 @@ pub enum PageCommand {
     },
 }
 
-pub async fn run(cmd: &PageCommand, api_url: &str, client: &Client) -> Result<()> {
+pub async fn run(
+    cmd: &PageCommand,
+    api_url: &str,
+    client: &Client,
+    format: OutputFormat,
+) -> Result<()> {
     match cmd {
         PageCommand::Get { title, revid } => {
-            commands::get::run(client, api_url, title.as_deref(), *revid).await
+            commands::get::run(client, api_url, title.as_deref(), *revid, format).await
         }
         PageCommand::Edit {
             title,
@@ -132,30 +138,42 @@ pub async fn run(cmd: &PageCommand, api_url: &str, client: &Client) -> Result<()
                 content: content.as_deref(),
                 null_edit: *null_edit,
             };
-            commands::edit::run(client, api_url, title, &opts).await
+            commands::edit::run(client, api_url, title, &opts, format).await
         }
         PageCommand::Info {
             title,
             revid,
             templates,
-        } => commands::info::run(client, api_url, title.as_deref(), *revid, *templates).await,
+        } => {
+            commands::info::run(
+                client,
+                api_url,
+                title.as_deref(),
+                *revid,
+                *templates,
+                format,
+            )
+            .await
+        }
         PageCommand::History { title, limit } => {
-            commands::history::run(client, api_url, title, *limit).await
+            commands::history::run(client, api_url, title, *limit, format).await
         }
         PageCommand::Category { title, limit } => {
-            commands::category::run(client, api_url, title, *limit).await
+            commands::category::run(client, api_url, title, *limit, format).await
         }
         PageCommand::Search { query, limit } => {
-            commands::search::run(client, api_url, query, *limit).await
+            commands::search::run(client, api_url, query, *limit, format).await
         }
         PageCommand::EmbeddedIn { title, limit } => {
-            commands::embedded_in::run(client, api_url, title, *limit).await
+            commands::embedded_in::run(client, api_url, title, *limit, format).await
         }
         PageCommand::RecentChanges {
             hours,
             limit,
             rc_type,
-        } => commands::recent_changes::run(client, api_url, *hours, *limit, rc_type).await,
-        PageCommand::Diff { revid, to } => commands::diff::run(client, api_url, *revid, *to).await,
+        } => commands::recent_changes::run(client, api_url, *hours, *limit, rc_type, format).await,
+        PageCommand::Diff { revid, to } => {
+            commands::diff::run(client, api_url, *revid, *to, format).await
+        }
     }
 }

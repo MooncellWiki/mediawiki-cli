@@ -5,6 +5,7 @@ use std::io::{self, Read};
 use std::path::PathBuf;
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
 pub struct EditOptions<'a> {
     pub summary: Option<&'a str>,
@@ -21,6 +22,7 @@ pub async fn run(
     api_url: &str,
     title: &str,
     opts: &EditOptions<'_>,
+    format: OutputFormat,
 ) -> Result<()> {
     let token_params = vec![
         ("action", "query".to_string()),
@@ -150,12 +152,15 @@ pub async fn run(
         bail!("edit failed: {}", json);
     }
 
-    let new_rev = edit
-        .get("newrevid")
-        .and_then(Value::as_i64)
-        .map(|v| v.to_string())
-        .unwrap_or_else(|| "-".to_string());
-
-    println!("Edit successful. newrevid={}", new_rev);
+    if format.is_json() {
+        print_json(edit)?;
+    } else {
+        let new_rev = edit
+            .get("newrevid")
+            .and_then(Value::as_i64)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "-".to_string());
+        println!("Edit successful. newrevid={}", new_rev);
+    }
     Ok(())
 }

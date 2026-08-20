@@ -1,10 +1,17 @@
 use anyhow::{Context, Result};
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
-pub async fn run(client: &Client, api_url: &str, revid: i64, to: Option<i64>) -> Result<()> {
+pub async fn run(
+    client: &Client,
+    api_url: &str,
+    revid: i64,
+    to: Option<i64>,
+    format: OutputFormat,
+) -> Result<()> {
     let mut params = vec![
         ("action", "compare".to_string()),
         ("fromrev", revid.to_string()),
@@ -36,6 +43,23 @@ pub async fn run(client: &Client, api_url: &str, revid: i64, to: Option<i64>) ->
         .get("totitle")
         .and_then(Value::as_str)
         .unwrap_or("<unknown>");
+    let body = compare.get("body").and_then(Value::as_str).unwrap_or("");
+
+    if format.is_json() {
+        let diff_text = if body.is_empty() {
+            String::new()
+        } else {
+            unified_diff(body)?
+        };
+        print_json(&json!({
+            "fromrevid": from_rev,
+            "torevid": to_rev,
+            "fromtitle": from_title,
+            "totitle": to_title,
+            "diff": diff_text,
+        }))?;
+        return Ok(());
+    }
 
     println!("diff wiki {to_title}");
     if from_rev > 0 {
@@ -49,15 +73,19 @@ pub async fn run(client: &Client, api_url: &str, revid: i64, to: Option<i64>) ->
     }
     println!("+++ {to_title} (revid {to_rev})");
 
-    let body = compare.get("body").and_then(Value::as_str).unwrap_or("");
     if body.is_empty() {
         println!("(no changes)");
         return Ok(());
     }
 
-    let text = extract_unified(body).context("unexpected compare body: no <pre> block")?;
-    print!("{}", html_unescape(text));
+    print!("{}", unified_diff(body)?);
     Ok(())
+}
+
+/// Extract the unified diff from the compare body and unescape HTML entities.
+fn unified_diff(body: &str) -> Result<String> {
+    let text = extract_unified(body).context("unexpected compare body: no <pre> block")?;
+    Ok(html_unescape(text))
 }
 
 /// `difftype=unified` wraps the diff in `<tr><td colspan="4"><pre>...</pre></td></tr>`.

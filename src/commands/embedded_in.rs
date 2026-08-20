@@ -3,9 +3,17 @@ use reqwest::Client;
 use serde_json::Value;
 
 use crate::api;
+use crate::output::{OutputFormat, print_lines};
 
-pub async fn run(client: &Client, api_url: &str, title: &str, limit: u32) -> Result<()> {
+pub async fn run(
+    client: &Client,
+    api_url: &str,
+    title: &str,
+    limit: u32,
+    format: OutputFormat,
+) -> Result<()> {
     let mut count: u32 = 0;
+    let mut titles: Vec<String> = Vec::new();
 
     let base_params = vec![
         ("action", "query".to_string()),
@@ -30,11 +38,15 @@ pub async fn run(client: &Client, api_url: &str, title: &str, limit: u32) -> Res
                 .get("title")
                 .and_then(Value::as_str)
                 .unwrap_or("<unknown>");
-            println!("{t}");
+            titles.push(t.to_string());
             count += 1;
         }
 
         Ok(count < limit)
     })
-    .await
+    .await?;
+
+    print_lines(&titles, format)?;
+
+    Ok(())
 }

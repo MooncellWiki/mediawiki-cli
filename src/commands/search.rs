@@ -1,10 +1,17 @@
 use anyhow::{Context, Result};
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
-pub async fn run(client: &Client, api_url: &str, query: &str, limit: u32) -> Result<()> {
+pub async fn run(
+    client: &Client,
+    api_url: &str,
+    query: &str,
+    limit: u32,
+    format: OutputFormat,
+) -> Result<()> {
     let params = vec![
         ("action", "query".to_string()),
         ("list", "search".to_string()),
@@ -19,6 +26,21 @@ pub async fn run(client: &Client, api_url: &str, query: &str, limit: u32) -> Res
         .pointer("/query/search")
         .and_then(Value::as_array)
         .context("unexpected API response: query.search missing")?;
+
+    if format.is_json() {
+        let items: Vec<Value> = results
+            .iter()
+            .map(|item| {
+                json!({
+                    "title": item.get("title").cloned().unwrap_or(Value::Null),
+                    "pageid": item.get("pageid").cloned().unwrap_or(Value::Null),
+                    "snippet": item.get("snippet").cloned().unwrap_or(Value::Null),
+                })
+            })
+            .collect();
+        print_json(&items)?;
+        return Ok(());
+    }
 
     if results.is_empty() {
         println!("No results.");

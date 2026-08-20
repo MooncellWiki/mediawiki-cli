@@ -3,6 +3,7 @@ use reqwest::Client;
 use serde_json::Value;
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
 pub struct CargoQueryParams<'a> {
     pub tables: &'a str,
@@ -16,7 +17,12 @@ pub struct CargoQueryParams<'a> {
     pub offset: Option<u32>,
 }
 
-pub async fn run(client: &Client, api_url: &str, params: CargoQueryParams<'_>) -> Result<()> {
+pub async fn run(
+    client: &Client,
+    api_url: &str,
+    params: CargoQueryParams<'_>,
+    format: OutputFormat,
+) -> Result<()> {
     let mut api_params = vec![
         ("action", "cargoquery".to_string()),
         ("tables", params.tables.to_string()),
@@ -52,19 +58,28 @@ pub async fn run(client: &Client, api_url: &str, params: CargoQueryParams<'_>) -
         .and_then(Value::as_array)
         .context("unexpected API response: cargoquery missing")?;
 
-    if results.is_empty() {
+    let mut rows: Vec<&Value> = Vec::new();
+    for item in results {
+        let row = item
+            .get("title")
+            .context("unexpected API response: cargoquery item missing title object")?;
+        rows.push(row);
+    }
+
+    if format.is_json() {
+        print_json(&rows)?;
+        return Ok(());
+    }
+
+    if rows.is_empty() {
         println!("No results.");
         return Ok(());
     }
 
     let mut all_keys = vec![];
 
-    for item in results {
-        let row = item
-            .get("title")
-            .and_then(Value::as_object)
-            .context("unexpected API response: cargoquery item missing title object")?;
-        for key in row.keys() {
+    for obj in rows.iter().filter_map(|row| row.as_object()) {
+        for key in obj.keys() {
             if !all_keys.contains(key) {
                 all_keys.push(key.clone());
             }
@@ -74,11 +89,7 @@ pub async fn run(client: &Client, api_url: &str, params: CargoQueryParams<'_>) -
     let header = all_keys.join("\t");
     println!("{header}");
 
-    for item in results {
-        let row = item
-            .get("title")
-            .and_then(Value::as_object)
-            .context("unexpected API response: cargoquery item missing title object")?;
+    for row in rows {
         let vals: Vec<String> = all_keys
             .iter()
             .map(|k| row.get(k).and_then(Value::as_str).unwrap_or("").to_string())

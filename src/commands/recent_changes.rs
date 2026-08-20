@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
 pub async fn run(
     client: &Client,
@@ -11,10 +12,14 @@ pub async fn run(
     hours: u64,
     limit: Option<u32>,
     rc_type: &str,
+    format: OutputFormat,
 ) -> Result<()> {
     let cutoff = iso8601_hours_ago(hours)?;
 
-    println!("Type\tRevID\tTimestamp\tUser\tTitle\tSize\tComment");
+    if !format.is_json() {
+        println!("Type\tRevID\tTimestamp\tUser\tTitle\tSize\tComment");
+    }
+    let mut rows: Vec<Value> = Vec::new();
     let mut count: u32 = 0;
 
     let base_params = vec![
@@ -45,11 +50,7 @@ pub async fn run(
             }
 
             let rc_type = item.get("type").and_then(Value::as_str).unwrap_or("-");
-            let revid = item
-                .get("revid")
-                .and_then(Value::as_i64)
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "-".to_string());
+            let revid = item.get("revid").and_then(Value::as_i64);
             let timestamp = item.get("timestamp").and_then(Value::as_str).unwrap_or("-");
             let user = item.get("user").and_then(Value::as_str).unwrap_or("-");
             let title = item
@@ -58,19 +59,41 @@ pub async fn run(
                 .unwrap_or("<unknown>");
             let oldlen = item.get("oldlen").and_then(Value::as_i64);
             let newlen = item.get("newlen").and_then(Value::as_i64);
-            let size = match (oldlen, newlen) {
-                (Some(oldlen), Some(newlen)) => format!("{newlen} ({:+})", newlen - oldlen),
-                _ => "-".to_string(),
-            };
             let comment = item.get("comment").and_then(Value::as_str).unwrap_or("");
 
-            println!("{rc_type}\t{revid}\t{timestamp}\t{user}\t{title}\t{size}\t{comment}");
+            if format.is_json() {
+                rows.push(json!({
+                    "type": rc_type,
+                    "revid": revid,
+                    "timestamp": timestamp,
+                    "user": user,
+                    "title": title,
+                    "oldlen": oldlen,
+                    "newlen": newlen,
+                    "comment": comment,
+                }));
+            } else {
+                let revid = revid
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "-".to_string());
+                let size = match (oldlen, newlen) {
+                    (Some(oldlen), Some(newlen)) => format!("{newlen} ({:+})", newlen - oldlen),
+                    _ => "-".to_string(),
+                };
+                println!("{rc_type}\t{revid}\t{timestamp}\t{user}\t{title}\t{size}\t{comment}");
+            }
             count += 1;
         }
 
         Ok(limit.is_none_or(|limit| count < limit))
     })
-    .await
+    .await?;
+
+    if format.is_json() {
+        print_json(&rows)?;
+    }
+
+    Ok(())
 }
 
 fn iso8601_hours_ago(hours: u64) -> Result<String> {

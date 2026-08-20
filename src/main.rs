@@ -5,6 +5,7 @@ use tracing_subscriber::EnvFilter;
 mod api;
 mod auth;
 mod commands;
+mod output;
 
 use commands::auth::AuthCommand;
 use commands::cargo::CargoCommand;
@@ -27,6 +28,9 @@ struct Cli {
         help = "Log level: error|warn|info|debug|trace"
     )]
     log_level: String,
+
+    #[arg(long, global = true, help = "Output command results as JSON")]
+    json: bool,
 
     #[command(subcommand)]
     command: Commands,
@@ -59,7 +63,11 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let filter = EnvFilter::try_new(&cli.log_level).unwrap_or_else(|_| EnvFilter::new("warn"));
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+    // Logs go to stderr so stdout stays clean for `--json` output.
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_writer(std::io::stderr)
+        .init();
 
     let cookie = match cli.cookie {
         Some(c) => Some(c),
@@ -68,9 +76,21 @@ async fn main() -> Result<()> {
 
     let client = api::build_client(cookie.as_deref())?;
 
+    let format = if cli.json {
+        output::OutputFormat::Json
+    } else {
+        output::OutputFormat::Text
+    };
+
     match cli.command {
-        Commands::Auth { command } => commands::auth::run(&command, &cli.api_url, &client).await,
-        Commands::Page { command } => commands::page::run(&command, &cli.api_url, &client).await,
-        Commands::Cargo { command } => commands::cargo::run(&command, &cli.api_url, &client).await,
+        Commands::Auth { command } => {
+            commands::auth::run(&command, &cli.api_url, &client, format).await
+        }
+        Commands::Page { command } => {
+            commands::page::run(&command, &cli.api_url, &client, format).await
+        }
+        Commands::Cargo { command } => {
+            commands::cargo::run(&command, &cli.api_url, &client, format).await
+        }
     }
 }

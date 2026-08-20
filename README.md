@@ -16,6 +16,31 @@ cargo build --release
 | `--api-url` | `https://prts.wiki/api.php` | MediaWiki API endpoint |
 | `--cookie` | — | Custom Cookie header, overrides stored login cookie |
 | `--log-level` | `warn` | Log level: `error` \| `warn` \| `info` \| `debug` \| `trace` |
+| `--json` | off | Output command results as JSON (global, works on any subcommand) |
+
+## JSON Output
+
+Pass `--json` (positioned anywhere on the command line) to get structured JSON instead of the
+human-readable text output. Lists become JSON arrays, detail views become JSON objects:
+
+```sh
+mediawiki-cli --json page info "Main Page"
+# { "title": ..., "pageid": ..., "url": ..., "categories": [...] }
+
+mediawiki-cli page history "Main Page" --limit 5 --json
+# [ { "revid": ..., "timestamp": ..., "user": ..., "size": ..., "comment": ... }, ... ]
+
+mediawiki-cli page search "arknights" --json
+# [ { "title": ..., "pageid": ..., "snippet": ... }, ... ]
+
+mediawiki-cli cargo query --tables building_skill2 --fields name,room --json
+# [ { "name": ..., "room": ... }, ... ]  (rows unwrapped from the API's "title" nesting)
+```
+
+`page get --json` returns `{ title, pageid, revid, content }`; `page diff --json` returns
+`{ fromrevid, torevid, fromtitle, totitle, diff }`; `page edit --json` returns the edit result
+object from the API; `auth status --json` returns the `userinfo` object. Log output (via
+`--log-level`) goes to stderr, so stdout stays valid JSON when piping to e.g. `jq`.
 
 ## Commands
 

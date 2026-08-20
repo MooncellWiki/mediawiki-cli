@@ -1,20 +1,22 @@
 use anyhow::{Result, bail};
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
 pub async fn run(
     client: &Client,
     api_url: &str,
     title: Option<&str>,
     revid: Option<i64>,
+    format: OutputFormat,
 ) -> Result<()> {
     let mut params = vec![
         ("action", "query".to_string()),
         ("prop", "revisions".to_string()),
         ("rvslots", "main".to_string()),
-        ("rvprop", "content".to_string()),
+        ("rvprop", "ids|content".to_string()),
         ("format", "json".to_string()),
         ("formatversion", "2".to_string()),
     ];
@@ -49,6 +51,15 @@ pub async fn run(
 
     let content = api::page_content(page)?;
 
-    println!("{content}");
+    if format.is_json() {
+        print_json(&json!({
+            "title": page.get("title").cloned().unwrap_or(Value::Null),
+            "pageid": page.get("pageid").cloned().unwrap_or(Value::Null),
+            "revid": page.pointer("/revisions/0/revid").cloned().unwrap_or(Value::Null),
+            "content": content,
+        }))?;
+    } else {
+        println!("{content}");
+    }
     Ok(())
 }

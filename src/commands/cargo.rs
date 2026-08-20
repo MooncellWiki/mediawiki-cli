@@ -3,6 +3,7 @@ use clap::Subcommand;
 use reqwest::Client;
 
 use crate::commands;
+use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum CargoCommand {
@@ -45,10 +46,17 @@ pub enum CargoCommand {
     },
 }
 
-pub async fn run(cmd: &CargoCommand, api_url: &str, client: &Client) -> Result<()> {
+pub async fn run(
+    cmd: &CargoCommand,
+    api_url: &str,
+    client: &Client,
+    format: OutputFormat,
+) -> Result<()> {
     match cmd {
-        CargoCommand::Tables => commands::cargo_tables::run(client, api_url).await,
-        CargoCommand::Fields { table } => commands::cargo_fields::run(client, api_url, table).await,
+        CargoCommand::Tables => commands::cargo_tables::run(client, api_url, format).await,
+        CargoCommand::Fields { table } => {
+            commands::cargo_fields::run(client, api_url, table, format).await
+        }
         CargoCommand::Query {
             tables,
             fields,
@@ -74,6 +82,7 @@ pub async fn run(cmd: &CargoCommand, api_url: &str, client: &Client) -> Result<(
                     limit: *limit,
                     offset: *offset,
                 },
+                format,
             )
             .await
         }

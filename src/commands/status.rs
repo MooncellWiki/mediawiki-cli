@@ -3,8 +3,9 @@ use reqwest::Client;
 use serde_json::Value;
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
-pub async fn run(client: &Client, api_url: &str) -> Result<()> {
+pub async fn run(client: &Client, api_url: &str, format: OutputFormat) -> Result<()> {
     let params = vec![
         ("action", "query".to_string()),
         ("meta", "userinfo".to_string()),
@@ -20,6 +21,11 @@ pub async fn run(client: &Client, api_url: &str) -> Result<()> {
     let ui = json
         .pointer("/query/userinfo")
         .context("unexpected API response: query.userinfo missing")?;
+
+    if format.is_json() {
+        print_json(ui)?;
+        return Ok(());
+    }
 
     let id = ui.get("id").and_then(Value::as_i64).unwrap_or(0);
     let name = ui

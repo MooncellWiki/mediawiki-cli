@@ -3,8 +3,9 @@ use reqwest::Client;
 use serde_json::Value;
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
-pub async fn run(client: &Client, api_url: &str) -> Result<()> {
+pub async fn run(client: &Client, api_url: &str, format: OutputFormat) -> Result<()> {
     let params = vec![
         ("action", "cargotables".to_string()),
         ("format", "json".to_string()),
@@ -18,13 +19,18 @@ pub async fn run(client: &Client, api_url: &str) -> Result<()> {
         .and_then(Value::as_array)
         .context("unexpected API response: cargotables missing")?;
 
-    if tables.is_empty() {
-        println!("No cargo tables found.");
+    let mut names: Vec<&str> = tables.iter().filter_map(Value::as_str).collect();
+    names.sort();
+
+    if format.is_json() {
+        print_json(&names)?;
         return Ok(());
     }
 
-    let mut names: Vec<&str> = tables.iter().filter_map(Value::as_str).collect();
-    names.sort();
+    if names.is_empty() {
+        println!("No cargo tables found.");
+        return Ok(());
+    }
 
     for name in names {
         println!("{name}");

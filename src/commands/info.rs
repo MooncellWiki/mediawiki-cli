@@ -1,8 +1,9 @@
 use anyhow::{Result, bail};
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
 pub async fn run(
     client: &Client,
@@ -10,9 +11,10 @@ pub async fn run(
     title: Option<&str>,
     revid: Option<i64>,
     templates: bool,
+    format: OutputFormat,
 ) -> Result<()> {
     if templates {
-        return list_templates(client, api_url, title, revid).await;
+        return list_templates(client, api_url, title, revid, format).await;
     }
 
     let mut params = vec![
@@ -50,10 +52,6 @@ pub async fn run(
         .unwrap_or(title.unwrap_or("-"));
     let full_url = page.get("fullurl").and_then(Value::as_str).unwrap_or("-");
 
-    println!("Title:  {display_title}");
-    println!("ID:     {page_id}");
-    println!("URL:    {full_url}");
-
     let cat_names: Vec<&str> = page
         .get("categories")
         .and_then(Value::as_array)
@@ -63,6 +61,21 @@ pub async fn run(
                 .collect()
         })
         .unwrap_or_default();
+
+    if format.is_json() {
+        print_json(&json!({
+            "title": display_title,
+            "pageid": page_id,
+            "url": full_url,
+            "categories": cat_names,
+        }))?;
+        return Ok(());
+    }
+
+    println!("Title:  {display_title}");
+    println!("ID:     {page_id}");
+    println!("URL:    {full_url}");
+
     if cat_names.is_empty() {
         println!("Cats:   (none)");
     } else {
@@ -77,6 +90,7 @@ async fn list_templates(
     api_url: &str,
     title: Option<&str>,
     revid: Option<i64>,
+    format: OutputFormat,
 ) -> Result<()> {
     let mut all_templates: Vec<String> = Vec::new();
 
@@ -126,7 +140,9 @@ async fn list_templates(
     )
     .await?;
 
-    if all_templates.is_empty() {
+    if format.is_json() {
+        print_json(&all_templates)?;
+    } else if all_templates.is_empty() {
         println!("No templates.");
     } else {
         for name in all_templates {

@@ -3,8 +3,15 @@ use reqwest::Client;
 use serde_json::Value;
 
 use crate::api;
+use crate::output::{OutputFormat, print_lines};
 
-pub async fn run(client: &Client, api_url: &str, title: &str, limit: Option<u32>) -> Result<()> {
+pub async fn run(
+    client: &Client,
+    api_url: &str,
+    title: &str,
+    limit: Option<u32>,
+    format: OutputFormat,
+) -> Result<()> {
     let cmtitle = if title.starts_with("Category:") {
         title.to_string()
     } else {
@@ -13,6 +20,7 @@ pub async fn run(client: &Client, api_url: &str, title: &str, limit: Option<u32>
 
     let max = limit.unwrap_or(u32::MAX);
     let mut total = 0u32;
+    let mut titles: Vec<String> = Vec::new();
 
     let base_params = vec![
         ("action", "query".to_string()),
@@ -37,11 +45,15 @@ pub async fn run(client: &Client, api_url: &str, title: &str, limit: Option<u32>
                 .get("title")
                 .and_then(Value::as_str)
                 .unwrap_or("<unknown>");
-            println!("{t}");
+            titles.push(t.to_string());
             total += 1;
         }
 
         Ok(true)
     })
-    .await
+    .await?;
+
+    print_lines(&titles, format)?;
+
+    Ok(())
 }

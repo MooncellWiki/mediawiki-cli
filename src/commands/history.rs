@@ -1,11 +1,21 @@
 use anyhow::{Result, bail};
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::api;
+use crate::output::{OutputFormat, print_json};
 
-pub async fn run(client: &Client, api_url: &str, title: &str, limit: u32) -> Result<()> {
-    println!("RevID\tTimestamp\tUser\tSize\tComment");
+pub async fn run(
+    client: &Client,
+    api_url: &str,
+    title: &str,
+    limit: u32,
+    format: OutputFormat,
+) -> Result<()> {
+    if !format.is_json() {
+        println!("RevID\tTimestamp\tUser\tSize\tComment");
+    }
+    let mut rows: Vec<Value> = Vec::new();
     let mut count: u32 = 0;
 
     let base_params = vec![
@@ -36,7 +46,15 @@ pub async fn run(client: &Client, api_url: &str, title: &str, limit: u32) -> Res
                 let size = rev.get("size").and_then(Value::as_i64).unwrap_or(0);
                 let comment = rev.get("comment").and_then(Value::as_str).unwrap_or("");
 
-                if comment.is_empty() {
+                if format.is_json() {
+                    rows.push(json!({
+                        "revid": rev_id,
+                        "timestamp": timestamp,
+                        "user": user,
+                        "size": size,
+                        "comment": comment,
+                    }));
+                } else if comment.is_empty() {
                     println!("{rev_id}\t{timestamp}\t{user}\t{size}");
                 } else {
                     println!("{rev_id}\t{timestamp}\t{user}\t{size}\t{comment}");
@@ -47,5 +65,11 @@ pub async fn run(client: &Client, api_url: &str, title: &str, limit: u32) -> Res
 
         Ok(count < limit)
     })
-    .await
+    .await?;
+
+    if format.is_json() {
+        print_json(&rows)?;
+    }
+
+    Ok(())
 }
