@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use crate::commands;
 use crate::commands::edit::EditOptions;
+use crate::commands::recent_changes::RecentChangesOptions;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
@@ -90,7 +91,7 @@ pub enum PageCommand {
     },
     /// List recent changes within a time window.
     RecentChanges {
-        /// How many hours back to look; 24 means the past day.
+        /// How many hours back to look; 24 means the past day. Ignored when --start or --end is set.
         #[arg(long, default_value_t = 24)]
         hours: u64,
         /// Maximum number of results (unlimited by default).
@@ -99,6 +100,15 @@ pub enum PageCommand {
         /// Change types to include, |-separated (edit|new|log|external|categorize).
         #[arg(long = "type", default_value = "edit|new")]
         rc_type: String,
+        /// Window start (older end), ISO 8601, e.g. 2026-08-01T00:00:00Z. Takes precedence over --hours.
+        #[arg(long)]
+        start: Option<String>,
+        /// Window end (newer end), ISO 8601. Takes precedence over --hours.
+        #[arg(long)]
+        end: Option<String>,
+        /// Log type to exclude (e.g. newusers); repeatable, only affects log entries.
+        #[arg(long = "exclude-logtype")]
+        exclude_logtype: Vec<String>,
     },
     /// Show a unified diff of a revision against its parent, or between two revisions.
     Diff {
@@ -171,7 +181,20 @@ pub async fn run(
             hours,
             limit,
             rc_type,
-        } => commands::recent_changes::run(client, api_url, *hours, *limit, rc_type, format).await,
+            start,
+            end,
+            exclude_logtype,
+        } => {
+            let opts = RecentChangesOptions {
+                hours: *hours,
+                limit: *limit,
+                rc_type,
+                start: start.as_deref(),
+                end: end.as_deref(),
+                exclude_logtype,
+            };
+            commands::recent_changes::run(client, api_url, &opts, format).await
+        }
         PageCommand::Diff { revid, to } => {
             commands::diff::run(client, api_url, *revid, *to, format).await
         }

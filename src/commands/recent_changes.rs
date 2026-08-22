@@ -6,15 +6,29 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::api;
 use crate::output::{OutputFormat, print_json};
 
+pub struct RecentChangesOptions<'a> {
+    pub hours: u64,
+    pub limit: Option<u32>,
+    pub rc_type: &'a str,
+    pub start: Option<&'a str>,
+    pub end: Option<&'a str>,
+    pub exclude_logtype: &'a [String],
+}
+
 pub async fn run(
     client: &Client,
     api_url: &str,
-    hours: u64,
-    limit: Option<u32>,
-    rc_type: &str,
+    opts: &RecentChangesOptions<'_>,
     format: OutputFormat,
 ) -> Result<()> {
-    let cutoff = iso8601_hours_ago(hours)?;
+    let RecentChangesOptions {
+        hours,
+        limit,
+        rc_type,
+        start,
+        end,
+        exclude_logtype,
+    } = opts;
 
     if !format.is_json() {
         println!("Type\tRevID\tTimestamp\tUser\tTitle\tSize\tComment");
@@ -22,19 +36,35 @@ pub async fn run(
     let mut rows: Vec<Value> = Vec::new();
     let mut count: u32 = 0;
 
-    let base_params = vec![
+    let mut base_params = vec![
         ("action", "query".to_string()),
         ("list", "recentchanges".to_string()),
         (
             "rcprop",
-            "ids|title|timestamp|user|comment|sizes".to_string(),
+            "ids|title|timestamp|user|comment|sizes|loginfo".to_string(),
         ),
         ("rctype", rc_type.to_string()),
         ("rclimit", "max".to_string()),
-        ("rcend", cutoff),
         ("format", "json".to_string()),
         ("formatversion", "2".to_string()),
     ];
+    match (start, end) {
+        // dir=older (default): rcstart is the newer end, rcend the older end.
+        (Some(start), Some(end)) => {
+            base_params.push(("rcstart", end.to_string()));
+            base_params.push(("rcend", start.to_string()));
+        }
+        (Some(start), None) => {
+            base_params.push(("rcstart", start.to_string()));
+            base_params.push(("rcdir", "newer".to_string()));
+        }
+        (None, Some(end)) => {
+            base_params.push(("rcend", end.to_string()));
+        }
+        (None, None) => {
+            base_params.push(("rcend", iso8601_hours_ago(*hours)?));
+        }
+    }
 
     api::paginate(client, api_url, &base_params, "rccontinue", None, |json| {
         let changes = json
@@ -44,12 +74,18 @@ pub async fn run(
 
         for item in changes {
             if let Some(limit) = limit
-                && count >= limit
+                && count >= *limit
             {
                 return Ok(false);
             }
 
             let rc_type = item.get("type").and_then(Value::as_str).unwrap_or("-");
+            let logtype = item.get("logtype").and_then(Value::as_str);
+            if let Some(logtype) = logtype
+                && exclude_logtype.iter().any(|t| t == logtype)
+            {
+                continue;
+            }
             let revid = item.get("revid").and_then(Value::as_i64);
             let timestamp = item.get("timestamp").and_then(Value::as_str).unwrap_or("-");
             let user = item.get("user").and_then(Value::as_str).unwrap_or("-");
@@ -64,6 +100,7 @@ pub async fn run(
             if format.is_json() {
                 rows.push(json!({
                     "type": rc_type,
+                    "logtype": logtype,
                     "revid": revid,
                     "timestamp": timestamp,
                     "user": user,
@@ -80,7 +117,11 @@ pub async fn run(
                     (Some(oldlen), Some(newlen)) => format!("{newlen} ({:+})", newlen - oldlen),
                     _ => "-".to_string(),
                 };
-                println!("{rc_type}\t{revid}\t{timestamp}\t{user}\t{title}\t{size}\t{comment}");
+                let type_label = match logtype {
+                    Some(logtype) => format!("{rc_type}/{logtype}"),
+                    None => rc_type.to_string(),
+                };
+                println!("{type_label}\t{revid}\t{timestamp}\t{user}\t{title}\t{size}\t{comment}");
             }
             count += 1;
         }
