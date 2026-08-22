@@ -1,10 +1,10 @@
 use anyhow::{Context, Result, bail};
 use reqwest::Client;
 use serde_json::Value;
-use std::io::{self, Read};
 use std::path::PathBuf;
 
 use crate::api;
+use crate::commands::read_content;
 use crate::output::{OutputFormat, print_json};
 
 pub struct EditOptions<'a> {
@@ -82,17 +82,8 @@ pub async fn run(
             );
         }
         current.replacen(old, new, 1)
-    } else if let Some(path) = opts.file {
-        std::fs::read_to_string(path)
-            .with_context(|| format!("failed to read file: {}", path.display()))?
-    } else if let Some(text) = opts.content {
-        text.to_string()
     } else {
-        let mut buf = String::new();
-        io::stdin()
-            .read_to_string(&mut buf)
-            .context("failed to read from stdin")?;
-        buf
+        read_content(opts.file.map(|p| p.as_path()), opts.content)?
     };
     tracing::debug!(len = content.len(), "read content");
 
@@ -115,31 +106,10 @@ pub async fn run(
         params.push(("createonly", "true".to_string()));
     }
 
-    let response = client
-        .post(api_url)
-        .form(&params)
-        .send()
-        .await
-        .with_context(|| format!("edit request failed: {api_url}"))?;
+    let response = api::post_json(client, api_url, &params).await?;
+    tracing::debug!(response = %serde_json::to_string_pretty(&response)?, "edit response");
 
-    let status = response.status();
-    let body = response
-        .text()
-        .await
-        .context("failed to read edit response body")?;
-
-    if !status.is_success() {
-        bail!("HTTP {} from API: {}", status, body);
-    }
-
-    let json: Value = serde_json::from_str(&body).context("edit response is not valid JSON")?;
-    tracing::debug!(response = %serde_json::to_string_pretty(&json)?, "edit response");
-
-    if let Some(err) = json.get("error") {
-        bail!("MediaWiki API error: {}", err);
-    }
-
-    let edit = json
+    let edit = response
         .get("edit")
         .context("unexpected edit response: edit field missing")?;
 
@@ -149,7 +119,7 @@ pub async fn run(
         .unwrap_or("unknown");
 
     if result != "Success" {
-        bail!("edit failed: {}", json);
+        bail!("edit failed: {}", response);
     }
 
     if format.is_json() {

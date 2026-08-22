@@ -5,6 +5,7 @@ use tracing_subscriber::EnvFilter;
 mod api;
 mod auth;
 mod commands;
+mod html_text;
 mod output;
 
 use commands::auth::AuthCommand;

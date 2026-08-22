@@ -46,6 +46,33 @@ pub async fn get_json(client: &Client, api_url: &str, params: &[(&str, String)])
     Ok(json)
 }
 
+pub async fn post_json(client: &Client, api_url: &str, params: &[(&str, String)]) -> Result<Value> {
+    let response = client
+        .post(api_url)
+        .form(params)
+        .send()
+        .await
+        .with_context(|| format!("request failed: {api_url}"))?;
+
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .context("failed to read HTTP response body")?;
+
+    if !status.is_success() {
+        bail!("HTTP {} from API: {}", status, body);
+    }
+
+    let json: Value = serde_json::from_str(&body).context("response is not valid JSON")?;
+
+    if let Some(err) = json.get("error") {
+        bail!("MediaWiki API error: {}", err);
+    }
+
+    Ok(json)
+}
+
 pub fn first_page(json: &Value) -> Result<&Value> {
     json.pointer("/query/pages")
         .and_then(Value::as_array)

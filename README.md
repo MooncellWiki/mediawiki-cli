@@ -102,6 +102,45 @@ mediawiki-cli page edit "Sandbox" --replace "old text" "new text"
 mediawiki-cli page edit "Sandbox" --null-edit
 ```
 
+### `page parse [options]`
+
+Render wikitext and print the resulting HTML **without saving anything** — useful for previewing
+template/parser-function output before editing a live page. Wikitext comes from stdin, `-c`, or
+`-f` (same as `page edit`).
+
+| Option | Description |
+|--------|-------------|
+| `--title <title>` | Parse in the context of this page title (affects link resolution etc.) |
+| `-c, --content <text>` | Provide wikitext directly on the command line |
+| `-f, --file <path>` | Read wikitext from a file |
+| `-t, --text` | Print plain text extracted with [html5ever](https://crates.io/crates/html5ever) instead of raw HTML: full entity decoding, `<head>`/`<style>`/`<script>` contents dropped, newlines between block elements. Good for grep and diffing, not layout-faithful |
+
+```sh
+mediawiki-cli page parse -c '{{#expr:1+1}}'
+echo 'x' | mediawiki-cli page parse --title "Sandbox" --text
+```
+
+### `page html <title> [--text]`
+
+Fetch the rendered HTML of a page as a browser sees it. Requests the page URL directly
+(`index.php?title=...` derived from `--api-url`) with the stored login cookie, bypassing
+anti-bot blocks on anonymous traffic. Add `--text` to extract plain text instead, using the
+same html5ever-based extractor as `page parse --text`.
+
+```sh
+mediawiki-cli page html "Main Page" | grep -c "some-string"
+mediawiki-cli page html "Main Page" --text | head
+```
+
+### `page purge <title> [title...]`
+
+Purge the server-side cache of one or more pages (re-render without an edit). Batch-friendly
+replacement for a null edit when you just need to refresh a page.
+
+```sh
+mediawiki-cli page purge "Main Page" "Template:Foo"
+```
+
 ### `page info [<title>] [--revid <ID>] [--templates]`
 
 Show page metadata (title, page ID, URL, categories). Use `--templates` to list all transcluded templates.

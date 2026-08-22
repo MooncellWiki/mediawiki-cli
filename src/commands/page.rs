@@ -110,6 +110,35 @@ pub enum PageCommand {
         #[arg(long = "exclude-logtype")]
         exclude_logtype: Vec<String>,
     },
+    /// Render wikitext and print the resulting HTML, without saving anything.
+    Parse {
+        /// Parse in the context of this page title (affects link resolution etc.).
+        #[arg(long)]
+        title: Option<String>,
+        /// Read wikitext from a file instead of stdin.
+        #[arg(short, long, conflicts_with_all = ["content"])]
+        file: Option<PathBuf>,
+        /// Provide wikitext directly on the command line.
+        #[arg(short, long, conflicts_with_all = ["file"])]
+        content: Option<String>,
+        /// Strip HTML tags and print plain text instead.
+        #[arg(short, long)]
+        text: bool,
+    },
+    /// Fetch the rendered HTML of a page (direct page view with the login cookie).
+    Html {
+        /// Page title.
+        title: String,
+        /// Extract plain text from the HTML instead of printing raw HTML.
+        #[arg(short, long)]
+        text: bool,
+    },
+    /// Purge the server-side cache of one or more pages.
+    Purge {
+        /// Page titles to purge.
+        #[arg(required = true)]
+        titles: Vec<String>,
+    },
     /// Show a unified diff of a revision against its parent, or between two revisions.
     Diff {
         /// Revision ID (the older side when a second ID is given).
@@ -197,6 +226,26 @@ pub async fn run(
         }
         PageCommand::Diff { revid, to } => {
             commands::diff::run(client, api_url, *revid, *to, format).await
+        }
+        PageCommand::Parse {
+            title,
+            file,
+            content,
+            text,
+        } => {
+            let opts = commands::parse::ParseOptions {
+                title: title.as_deref(),
+                file: file.as_ref(),
+                content: content.as_deref(),
+                text: *text,
+            };
+            commands::parse::run(client, api_url, &opts, format).await
+        }
+        PageCommand::Html { title, text } => {
+            commands::html::run(client, api_url, title, *text, format).await
+        }
+        PageCommand::Purge { titles } => {
+            commands::purge::run(client, api_url, titles, format).await
         }
     }
 }
