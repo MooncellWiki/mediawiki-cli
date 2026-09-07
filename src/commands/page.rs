@@ -29,9 +29,21 @@ pub enum PageCommand {
         /// Mark as minor edit.
         #[arg(long)]
         minor: bool,
+        /// Mark as a bot edit (rendered as bot edit when the account has the bot right).
+        #[arg(long)]
+        bot: bool,
         /// Only create the page; fail if it already exists.
         #[arg(long)]
         create_only: bool,
+        /// Edit a section: "new" appends a new section, or give a section index.
+        #[arg(long, conflicts_with_all = ["replace", "null_edit"])]
+        section: Option<String>,
+        /// Heading for the appended section; requires --section new.
+        #[arg(long, requires = "section")]
+        sectiontitle: Option<String>,
+        /// Base revision ID for conflict detection; fails with editconflict if a newer revision exists.
+        #[arg(long)]
+        baserevid: Option<i64>,
         /// Read content from a file instead of stdin.
         #[arg(short, long, conflicts_with_all = ["replace", "content"])]
         file: Option<PathBuf>,
@@ -162,7 +174,11 @@ pub async fn run(
             title,
             summary,
             minor,
+            bot,
             create_only,
+            section,
+            sectiontitle,
+            baserevid,
             file,
             replace,
             content,
@@ -171,7 +187,11 @@ pub async fn run(
             let opts = EditOptions {
                 summary: summary.as_deref(),
                 minor: *minor,
+                bot: *bot,
                 create_only: *create_only,
+                section: section.as_deref(),
+                sectiontitle: sectiontitle.as_deref(),
+                baserevid: *baserevid,
                 file: file.as_ref(),
                 replace: replace.as_deref(),
                 content: content.as_deref(),

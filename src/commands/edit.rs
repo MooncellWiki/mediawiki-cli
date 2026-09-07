@@ -10,7 +10,11 @@ use crate::output::{OutputFormat, print_json};
 pub struct EditOptions<'a> {
     pub summary: Option<&'a str>,
     pub minor: bool,
+    pub bot: bool,
     pub create_only: bool,
+    pub section: Option<&'a str>,
+    pub sectiontitle: Option<&'a str>,
+    pub baserevid: Option<i64>,
     pub file: Option<&'a PathBuf>,
     pub replace: Option<&'a [String]>,
     pub content: Option<&'a str>,
@@ -102,8 +106,26 @@ pub async fn run(
     if opts.minor {
         params.push(("minor", "true".to_string()));
     }
+    if opts.bot {
+        params.push(("bot", "true".to_string()));
+    }
     if opts.create_only {
         params.push(("createonly", "true".to_string()));
+    }
+    if let Some(section) = opts.section {
+        if section != "new" && section.parse::<u32>().is_err() {
+            bail!("invalid --section value: {section:?} (expected \"new\" or a section index)");
+        }
+        params.push(("section", section.to_string()));
+        if let Some(st) = opts.sectiontitle {
+            if section != "new" {
+                bail!("--sectiontitle is only valid together with --section new");
+            }
+            params.push(("sectiontitle", st.to_string()));
+        }
+    }
+    if let Some(rev) = opts.baserevid {
+        params.push(("baserevid", rev.to_string()));
     }
 
     let response = api::post_json(client, api_url, &params).await?;
