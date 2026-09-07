@@ -15,6 +15,7 @@ cargo build --release
 |--------|---------|-------------|
 | `--api-url` | `https://prts.wiki/api.php` | MediaWiki API endpoint |
 | `--cookie` | — | Custom Cookie header, overrides stored login cookie |
+| `--account` | `auto` | Which stored login session to use: `auto` \| `user` \| `bot` (global) |
 | `--log-level` | `warn` | Log level: `error` \| `warn` \| `info` \| `debug` \| `trace` |
 | `--json` | off | Output command results as JSON (global, works on any subcommand) |
 
@@ -39,27 +40,46 @@ mediawiki-cli cargo query --tables building_skill2 --fields name,room --json
 
 `page get --json` returns `{ title, pageid, revid, content }`; `page diff --json` returns
 `{ fromrevid, torevid, fromtitle, totitle, diff }`; `page edit --json` returns the edit result
-object from the API; `auth status --json` returns the `userinfo` object. Log output (via
-`--log-level`) goes to stderr, so stdout stays valid JSON when piping to e.g. `jq`.
+object from the API; `auth status --json` returns `{ "user": <userinfo>|null, "bot": <userinfo>|null }`
+(with `--cookie`, the raw userinfo object of that cookie instead).
+Log output (via `--log-level`) goes to stderr, so stdout stays valid JSON when piping to e.g. `jq`.
 
 ## Commands
 
 ### `auth login <username>`
 
-Log in and store the session cookie. Prompts for password interactively. Supports 2FA — if the wiki requires a second factor, you'll be prompted for it automatically.
+Log in as a regular user and store the **user session** cookie. Prompts for password interactively. Supports 2FA — if the wiki requires a second factor, you'll be prompted for it automatically.
 
 ```sh
 mediawiki-cli auth login MyUser
 ```
 
-Session cookies are persisted to `~/.config/mediawiki-cli/cookies.json` (keyed by API URL).
+### `auth login-bot <username>`
+
+Log in a bot account (username from [Special:BotPasswords](https://www.mediawiki.org/wiki/Special:BotPasswords), e.g. `MyBot@cli`) via `action=login` and store the **bot session** cookie. The password is read from `MEDIAWIKI_BOT_PASSWORD` if set, otherwise prompted interactively. Bot credentials are saved locally so an expired bot session can be re-established automatically.
+
+```sh
+mediawiki-cli auth login-bot MyBot@cli
+```
 
 ### `auth status`
 
-Show current login status: username, user groups, rights, edit count, registration date, and email.
+Show the login status of **both** stored sessions (user and bot): username, user groups, rights, edit count, registration date, and email — or `no stored session` if that account never logged in. With `--cookie`, report the status of that cookie instead of the stored sessions.
 
 ```sh
 mediawiki-cli auth status
+# user: logged in as MyUser (id=123)
+#   Groups: sysop, bureaucrat
+# bot: logged in as MyBot@cli (id=456)
+```
+
+### `auth forget [user|bot]`
+
+Clear stored session cookies and saved bot credentials for this wiki. With no argument both accounts are forgotten; pass `user` or `bot` to clear only that one (`bot` also removes the saved bot credentials).
+
+```sh
+mediawiki-cli auth forget        # forget both
+mediawiki-cli auth forget user   # forget only the user session
 ```
 
 ### `page get [<title>] [--revid <ID>]`
@@ -123,9 +143,9 @@ echo 'x' | mediawiki-cli page parse --title "Sandbox" --text
 ### `page html <title> [--text]`
 
 Fetch the rendered HTML of a page as a browser sees it. Requests the page URL directly
-(`index.php?title=...` derived from `--api-url`) with the stored login cookie, bypassing
-anti-bot blocks on anonymous traffic. Add `--text` to extract plain text instead, using the
-same html5ever-based extractor as `page parse --text`.
+(`index.php?title=...` derived from `--api-url`) with the selected login session's cookie,
+bypassing anti-bot blocks on anonymous traffic. Add `--text` to extract plain text instead,
+using the same html5ever-based extractor as `page parse --text`.
 
 ```sh
 mediawiki-cli page html "Main Page" | grep -c "some-string"
@@ -226,4 +246,33 @@ mediawiki-cli cargo query --tables building_skill2 --fields name,room --where "r
 
 ## Authentication
 
-`mediawiki-cli` uses the MediaWiki `clientlogin` API for authentication. After logging in with `auth login`, the session cookie is stored locally and automatically sent with subsequent requests. You can also pass a cookie directly with `--cookie` without using the login flow.
+`mediawiki-cli` keeps two independent login sessions per wiki, stored in
+`~/.config/mediawiki-cli/cookies.json` under separate slots (`<api-url>#user` and
+`<api-url>#bot`), so logging in as one never overwrites the other:
+
+- **user session** — `auth login` (clientlogin API, supports 2FA)
+- **bot session** — `auth login-bot` (`action=login` with a BotPasswords account); the bot
+  password is saved to `~/.config/mediawiki-cli/credentials.json` so an expired bot session
+  is re-established automatically
+
+Every command picks a session via `--account`:
+
+- `--account user` / `--account bot` — use exactly that session (no silent fallback; a
+  missing session means anonymous requests, with a warning)
+- `--account auto` (the default) — user session first: use it if valid, otherwise fall back
+  to the bot session (re-logging in the bot from saved credentials if needed)
+
+If saved bot credentials exist but the automatic re-login fails (e.g. the bot password was
+revoked), the command exits with an error instead of silently continuing anonymously —
+re-run `auth login-bot` to fix it. A corrupt or unreadable `credentials.json` is treated the
+same way: commands warn and continue without auto re-login rather than failing. (Session
+resolution only happens for wiki-facing commands; `auth` subcommands always work directly
+on the stored state.)
+
+`page edit` additionally refuses to run with an expired session: on wikis that allow
+anonymous editing, continuing would attribute the edit to your IP, so it fails with a hint
+to re-run `auth login` / `auth login-bot` instead.
+
+`--cookie` still overrides both and skips session resolution entirely. Which session was
+chosen is logged at `info` level (`--log-level info`), and `auth status` shows the state of
+both sessions.

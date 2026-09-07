@@ -16,6 +16,7 @@ pub mod history;
 pub mod html;
 pub mod info;
 pub mod login;
+pub mod login_bot;
 pub mod page;
 pub mod parse;
 pub mod purge;

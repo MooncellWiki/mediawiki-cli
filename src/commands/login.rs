@@ -9,7 +9,7 @@ pub async fn run(api_url: &str, username: &str, format: OutputFormat) -> Result<
 
     let result = auth::login(api_url, username, &password).await?;
 
-    auth::save_cookie(api_url, &result.cookie)?;
+    auth::save_cookie(api_url, auth::AccountKind::User, &result.cookie)?;
 
     if format.is_json() {
         print_json(&json!({

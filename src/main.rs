@@ -12,6 +12,13 @@ use commands::auth::AuthCommand;
 use commands::cargo::CargoCommand;
 use commands::page::PageCommand;
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum AccountChoice {
+    Auto,
+    User,
+    Bot,
+}
+
 #[derive(Debug, Parser)]
 #[command(name = "mediawiki-cli")]
 #[command(about = "CLI for MediaWiki API", version)]
@@ -21,6 +28,15 @@ struct Cli {
 
     #[arg(long, help = "Custom Cookie header, overrides stored login cookie")]
     cookie: Option<String>,
+
+    #[arg(
+        long,
+        global = true,
+        value_enum,
+        default_value = "auto",
+        help = "Login session to use: auto prefers a valid user session, falls back to bot"
+    )]
+    account: AccountChoice,
 
     #[arg(
         short,
@@ -56,6 +72,31 @@ enum Commands {
     },
 }
 
+/// Resolve the login session (unless `--cookie` overrides it) and build the
+/// client for wiki-facing commands. Auth subcommands must not use this: they
+/// manage sessions themselves and have to work even when the stored ones are
+/// broken (a failed bot re-login must not block `auth forget`/`login-bot`).
+/// `require_valid` makes an expired session a hard error instead of
+/// continuing anonymously — used by wiki-modifying commands (`page edit`),
+/// where an anonymous fallback would attribute the change to the caller's IP.
+async fn session_client(
+    api_url: &str,
+    cookie: Option<String>,
+    account: Option<auth::AccountKind>,
+    require_valid: bool,
+) -> Result<reqwest::Client> {
+    let cookie = match cookie {
+        Some(c) => Some(c),
+        None => auth::resolve_session(api_url, account, require_valid)
+            .await?
+            .map(|(kind, cookie)| {
+                tracing::info!(account = kind.as_str(), "using stored login session");
+                cookie
+            }),
+    };
+    api::build_client(cookie.as_deref())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Die quietly on SIGPIPE so `| head` doesn't panic in println!.
@@ -70,12 +111,11 @@ async fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    let cookie = match cli.cookie {
-        Some(c) => Some(c),
-        None => auth::load_cookie(&cli.api_url)?,
+    let account = match cli.account {
+        AccountChoice::Auto => None,
+        AccountChoice::User => Some(auth::AccountKind::User),
+        AccountChoice::Bot => Some(auth::AccountKind::Bot),
     };
-
-    let client = api::build_client(cookie.as_deref())?;
 
     let format = if cli.json {
         output::OutputFormat::Json
@@ -85,12 +125,16 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Auth { command } => {
-            commands::auth::run(&command, &cli.api_url, &client, format).await
+            commands::auth::run(&command, &cli.api_url, cli.cookie.as_deref(), format).await
         }
         Commands::Page { command } => {
+            // Edits must not fall back to an anonymous (stale-cookie) request.
+            let require_valid = matches!(command, PageCommand::Edit { .. });
+            let client = session_client(&cli.api_url, cli.cookie, account, require_valid).await?;
             commands::page::run(&command, &cli.api_url, &client, format).await
         }
         Commands::Cargo { command } => {
+            let client = session_client(&cli.api_url, cli.cookie, account, false).await?;
             commands::cargo::run(&command, &cli.api_url, &client, format).await
         }
     }
