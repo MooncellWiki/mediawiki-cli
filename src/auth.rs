@@ -252,7 +252,7 @@ pub async fn login(api_url: &str, username: &str, password: &str) -> Result<Logi
         ("action", "clientlogin".to_string()),
         ("username", username.to_string()),
         ("password", password.to_string()),
-        ("logintoken", login_token),
+        ("logintoken", login_token.clone()),
         ("loginreturnurl", "https://localhost/".to_string()),
         ("format", "json".to_string()),
     ];
@@ -343,6 +343,9 @@ pub async fn login(api_url: &str, username: &str, password: &str) -> Result<Logi
                 params.clear();
                 params.push(("action", "clientlogin".to_string()));
                 params.push(("logincontinue", "true".to_string()));
+                // AuthManager requires the token on every clientlogin call,
+                // including continuations.
+                params.push(("logintoken", login_token.clone()));
                 params.push(("format", "json".to_string()));
                 for (k, v) in extra {
                     params.push((leak_str(&k), v));
